@@ -7,23 +7,29 @@ st.set_page_config(page_title="Hunter Trading Calculator", layout="wide")
 st.title("🔥 HUNTER TRADING CALCULATOR – ALL IN ONE")
 st.markdown("---")
 
-# Sidebar – Symbol & Live Price
-st.sidebar.header("📊 Market")
-symbol = st.sidebar.text_input("Symbol (ETH-USD / BTC-USD / TATAMOTORS.NS)", value="ETH-USD").upper()
+# -------- MARKET BLOCK (MAIN SCREEN – MOBILE FRIENDLY) --------
+st.subheader("📊 Market")
 
-# Live price
-try:
-    ticker = yf.Ticker(symbol)
-    data = ticker.history(period="1d")
-    live_price = float(data["Close"].iloc[-1])
-    st.sidebar.metric("LIVE PRICE", f"{live_price:.2f}")
-except Exception:
-    live_price = st.sidebar.number_input("Manual Price", value=3000.0)
-    st.sidebar.warning("Live price error, manual value used.")
+colm1, colm2 = st.columns(2)
+with colm1:
+    symbol = st.text_input(
+        "Symbol (ETH-USD / BTC-USD / TATAMOTORS.NS)",
+        value="ETH-USD"
+    ).upper()
 
-st.sidebar.markdown("---")
+with colm2:
+    try:
+        ticker = yf.Ticker(symbol)
+        data = ticker.history(period="1d")
+        live_price = float(data["Close"].iloc[-1])
+        st.metric("LIVE PRICE", f"{live_price:.2f}")
+    except Exception:
+        live_price = st.number_input("Manual Price", value=3000.0)
+        st.warning("Live price error, manual value used.")
 
-# Main inputs
+st.markdown("---")
+
+# -------- TRADE INPUTS --------
 col1, col2, col3 = st.columns(3)
 
 with col1:
@@ -41,10 +47,11 @@ with col5:
 with col6:
     sl_price = st.number_input("Stop Loss (SL)", value=round(live_price * 0.98, 2))
 
+# -------- CALCULATION --------
 if st.button("🚀 CALCULATE", type="primary"):
     # Required margin & position value
     position_value = qty * entry_price
-    required_margin = position_value / leverage
+    required_margin = position_value / leverage if leverage != 0 else 0
 
     # PnL calculations
     if side == "BUY":
@@ -59,7 +66,7 @@ if st.button("🚀 CALCULATE", type="primary"):
     # ROE on margin
     roe = (pnl_live / required_margin) * 100 if required_margin != 0 else 0.0
 
-    # Top summary
+    # -------- SUMMARY METRICS --------
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -71,7 +78,7 @@ if st.button("🚀 CALCULATE", type="primary"):
 
     st.markdown("---")
 
-    # Detailed panel
+    # -------- DETAILS --------
     c4, c5 = st.columns(2)
 
     with c4:
@@ -100,7 +107,7 @@ if st.button("🚀 CALCULATE", type="primary"):
         else:
             st.error("❌ You are in LOSS right now.")
 
-    # Optional table
+    # -------- SUMMARY TABLE --------
     st.markdown("---")
     st.subheader("📋 Quick Summary Table")
 
@@ -116,13 +123,13 @@ if st.button("🚀 CALCULATE", type="primary"):
                 "Risk/Reward (R:R)",
             ],
             "Value": [
-                f"${required_margin:,.2f}",
-                f"${position_value:,.2f}",
-                f"${pnl_live:,.2f}",
-                f"${pnl_tp:,.2f}",
-                f"${pnl_sl:,.2f}",
-                f"{roe:,.1f}%",
-                f"1 : {rr:,.2f}",
+                f\"${required_margin:,.2f}\",
+                f\"${position_value:,.2f}\",
+                f\"${pnl_live:,.2f}\",
+                f\"${pnl_tp:,.2f}\",
+                f\"${pnl_sl:,.2f}\",
+                f\"{roe:,.1f}%\",
+                f\"1 : {rr:,.2f}\",
             ],
         }
     )
