@@ -2,27 +2,33 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# ================== UI CLEANUP (hide footer, menu) ==================
+# ================== UI CLEANUP ==================
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# ================== PAGE CONFIG ==================
 st.set_page_config(
     page_title="Hunter Trading Calculator",
     page_icon="💹",
     layout="centered",
 )
 
-st.title("💹 Hunter All-in-One Trading Calculator")
-st.write("Position Size + PnL + ROE + TP/SL for crypto & stocks.")
+# ================== HEADER ==================
+st.markdown(
+    "<h1 style='text-align:center;'>💹 Hunter Trading Calculator</h1>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    "<p style='text-align:center;'>Position Size · PnL · ROE · TP/SL (Crypto & Stocks)</p>",
+    unsafe_allow_html=True,
+)
+st.markdown("---")
 
-# ================== INPUT SECTION ==================
+# ================== TRADE INPUTS ==================
 st.subheader("🧮 Trade Inputs")
 
 col1, col2 = st.columns(2)
@@ -37,39 +43,39 @@ with col1:
         "Leverage (1–200x)",
         min_value=1,
         max_value=200,
-        value=50
+        value=50,
     )
 
 with col2:
-    margin = st.number_input(
-        "Capital / Margin (in account currency)",
-        min_value=0.0,
-        value=100.0
-    )
+    # MARGIN REMOVED – only info text
+    st.markdown("**Account Margin:** Not required, calculator works with quantity only.")
     entry_price = st.number_input(
         "Entry Price",
         min_value=0.0,
-        value=0.0,
-        help="If 0 hai to live price se entry assume ho sakti hai."
-    )
-    qty_manual = st.number_input(
-        "Quantity (optional, 0 = auto from margin)",
-        min_value=0.0,
-        value=0.0
+        value=30000.0,
+        help="If blank idea nahi, live price dekh ke daal sakta hai.",
     )
 
 col3, col4 = st.columns(2)
 with col3:
+    qty = st.number_input(
+        "Quantity (Contracts / Coins / Shares)",
+        min_value=0.0,
+        value=0.1,
+    )
+with col4:
     tp_price = st.number_input(
         "Take Profit (TP) Price",
         min_value=0.0,
-        value=0.0
+        value=31000.0,
     )
-with col4:
+
+col5, col6 = st.columns(2)
+with col5:
     sl_price = st.number_input(
         "Stop Loss (SL) Price",
         min_value=0.0,
-        value=0.0
+        value=29500.0,
     )
 
 st.markdown("---")
@@ -97,10 +103,10 @@ if symbol:
         if not data.empty:
             current_price = float(data["Close"].iloc[-1])
         else:
-            current_price = 0.0
+            current_price = entry_price
 
         info = ticker.info
-        currency_code = info.get("currency", "USD") or "USD"  # fallback [web:32][web:41]
+        currency_code = info.get("currency", "USD") or "USD"  # yfinance currency field [web:32][web:41]
 
         if currency_code in ["USD", "USDT"]:
             currency_symbol = "$"
@@ -119,7 +125,6 @@ if symbol:
 else:
     current_price = entry_price
 
-# Agar user ne entry_price = 0 chhoda hai, to default entry = current_price
 if entry_price == 0 and current_price:
     entry_price = current_price
 
@@ -130,27 +135,10 @@ with col_ep:
     st.metric("Entry Price", f"{currency_symbol}{entry_price:,.2f}")
 
 st.caption(f"Currency detected: {currency_code}")
-
 st.markdown("---")
 
-# ================== CORE CALCULATIONS ==================
-# Position size from margin & leverage if qty not given
-if entry_price > 0:
-    if qty_manual > 0:
-        qty = qty_manual
-        position_value = qty * entry_price
-        required_margin = position_value / leverage if leverage > 0 else position_value
-    else:
-        position_value = margin * leverage
-        qty = position_value / entry_price
-        required_margin = margin
-else:
-    qty = 0.0
-    position_value = 0.0
-    required_margin = 0.0
-
+# ================== CALCULATIONS ==================
 def calc_pnl(entry, price, quantity, side_):
-    """Simple PnL for long / short."""
     if price == 0 or quantity == 0 or entry == 0:
         return 0.0
     if side_ == "BUY":
@@ -158,18 +146,18 @@ def calc_pnl(entry, price, quantity, side_):
     else:
         return (entry - price) * quantity
 
-# Live PnL, TP PnL, SL PnL
+position_value = qty * entry_price
+required_margin = position_value / leverage if leverage > 0 else position_value
+
 pnl_live = calc_pnl(entry_price, current_price, qty, side)
 pnl_tp = calc_pnl(entry_price, tp_price, qty, side) if tp_price > 0 else 0.0
 pnl_sl = calc_pnl(entry_price, sl_price, qty, side) if sl_price > 0 else 0.0
 
-# ROE (based on margin used)
 if required_margin > 0:
     roe = (pnl_live / required_margin) * 100
 else:
     roe = 0.0
 
-# Risk / Reward ratio
 risk = abs(pnl_sl)
 reward = abs(pnl_tp)
 if risk > 0 and reward > 0:
@@ -177,7 +165,7 @@ if risk > 0 and reward > 0:
 else:
     rr = 0.0
 
-# ================== POSITION OVERVIEW CARDS ==================
+# ================== POSITION OVERVIEW ==================
 st.subheader("📈 Position Overview")
 
 col_a, col_b, col_c = st.columns(3)
@@ -186,11 +174,11 @@ with col_a:
 with col_b:
     st.metric("Position Value", f"{currency_symbol}{position_value:,.2f}")
 with col_c:
-    st.metric("Required Margin", f"{currency_symbol}{required_margin:,.2f}")
+    st.metric("Used Margin (from qty & lev)", f"{currency_symbol}{required_margin:,.2f}")
 
 st.markdown("---")
 
-# ================== PnL & RISK METRICS ==================
+# ================== PnL & RISK ==================
 st.subheader("💰 PnL & Risk Metrics")
 
 col_p1, col_p2, col_p3 = st.columns(3)
@@ -209,14 +197,14 @@ with col_r2:
 
 st.markdown("---")
 
-# ================== QUICK SUMMARY TABLE ==================
+# ================== SUMMARY TABLE ==================
 st.subheader("📊 Quick Summary Table")
 
 df = pd.DataFrame(
     {
         "Metric": [
-            "Required Margin",
             "Position Value",
+            "Used Margin",
             "Live PnL",
             "TP PnL",
             "SL PnL",
@@ -224,8 +212,8 @@ df = pd.DataFrame(
             "Risk/Reward (R:R)",
         ],
         "Value": [
-            f"{currency_symbol}{required_margin:,.2f}",
             f"{currency_symbol}{position_value:,.2f}",
+            f"{currency_symbol}{required_margin:,.2f}",
             f"{currency_symbol}{pnl_live:,.2f}",
             f"{currency_symbol}{pnl_tp:,.2f}",
             f"{currency_symbol}{pnl_sl:,.2f}",
@@ -238,5 +226,5 @@ df = pd.DataFrame(
 st.table(df)
 
 st.caption(
-    "Hunter All-in-One Trading Calculator – Position Size + PnL + ROE + TP/SL (Crypto & Stocks)"
+    "Hunter Trading Calculator – Qty based · no manual margin input."
 )
