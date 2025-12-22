@@ -2,28 +2,43 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# ================== UI CLEANUP ==================
-hide_streamlit_style = """
+# ================== HIDE STREAMLIT MENU + FOOTER ==================
+hide_default_format = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    footer:before {content: ''; visibility: hidden;}
     </style>
 """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+st.markdown(hide_default_format, unsafe_allow_html=True)
 
+# ================== PAGE CONFIG + BASIC THEME ==================
 st.set_page_config(
     page_title="Hunter Trading Calculator",
     page_icon="💹",
     layout="centered",
 )
 
+page_bg = """
+<style>
+.stApp {
+    background-color: #050509;
+}
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+}
+</style>
+"""
+st.markdown(page_bg, unsafe_allow_html=True)
+
 # ================== HEADER ==================
 st.markdown(
-    "<h1 style='text-align:center;'>💹 Hunter Trading Calculator</h1>",
+    "<h1 style='text-align:center; margin-bottom:0;'>💹 Hunter Trading Calculator</h1>",
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<p style='text-align:center;'>Position Size · PnL · ROE · TP/SL (Crypto & Stocks)</p>",
+    "<p style='text-align:center; color:#cccccc;'>Position Size · PnL · ROE · TP/SL (Crypto & Stocks)</p>",
     unsafe_allow_html=True,
 )
 st.markdown("---")
@@ -47,13 +62,12 @@ with col1:
     )
 
 with col2:
-    # MARGIN REMOVED – only info text
     st.markdown("**Account Margin:** Not required, calculator works with quantity only.")
     entry_price = st.number_input(
         "Entry Price",
         min_value=0.0,
         value=30000.0,
-        help="If blank idea nahi, live price dekh ke daal sakta hai.",
+        help="If live price ke aas-paas daal, exact na bhi ho chalega.",
     )
 
 col3, col4 = st.columns(2)
@@ -61,7 +75,7 @@ with col3:
     qty = st.number_input(
         "Quantity (Contracts / Coins / Shares)",
         min_value=0.0,
-        value=0.1,
+        value=0.10,
     )
 with col4:
     tp_price = st.number_input(
