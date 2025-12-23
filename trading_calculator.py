@@ -3,56 +3,54 @@ import yfinance as yf
 import pandas as pd
 from groq import Groq
 
-# 1. UI Setup
-st.set_page_config(page_title="Begusarai Hunter Terminal", layout="centered")
+# 1. UI Configuration (Wide & Mobile Friendly)
+st.set_page_config(page_title="Hunter AI Terminal", layout="wide")
 st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;}</style>", unsafe_allow_html=True)
-
-st.title("🏹 HUNTER AI TERMINAL v8.4")
-st.caption("Active AI Model | Smart Detection | Blank Slate")
 
 # --- 2. SECRETS & AI SETUP ---
 try:
-    # Tumhare Streamlit Secrets se key uthayega [image:10]
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     client = Groq(api_key=GROQ_KEY)
 except:
-    st.error("Bhai, Streamlit Secrets mein 'GROQ_API_KEY' check karo!")
+    st.error("Bhai, Secrets mein 'GROQ_API_KEY' check karo!")
     GROQ_KEY = None
 
-def get_ai_analysis(symbol, price, side, pnl, roe):
-    if not GROQ_KEY: return "Bhai, API Key connect nahi hui. Secrets check karo!"
-    
+def get_ai_insight(symbol, price, side, pnl, roe):
+    # NEWS + PREDICTION Prompt [web:113]
     prompt = f"""
-    Bhai, main Begusarai se ek trader hoon. Mera current trade details ye hain:
-    Stock/Crypto: {symbol} | Current Price: {price} | Side: {side}
-    Live PnL: {pnl} | ROE: {roe}%
+    You are a Begusarai Trader AI. Analyze this trade:
+    Symbol: {symbol} | Price: {price} | Side: {side} | PnL: {pnl} | ROE: {roe}%
     
-    Mujhe is trade ke baare mein short analysis do. 
-    1. Trend kaisa lag raha hai?
-    2. Kya mujhe hold karna chahiye ya profit book karna chahiye?
-    Ekdum trader wali desi Hinglish bhasha mein jawab do (short and powerful).
+    Tasks:
+    1. Latest generic market news related to this asset.
+    2. Short-term Price Prediction (Bullish/Bearish).
+    3. Final advice for a 'Hunter' trader.
+    Speak in Hinglish (Desi style). Keep it short.
     """
     try:
-        # llama-3.1-8b-instant is currently the most stable active model [web:85]
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant", 
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
+            messages=[{"role": "user", "content": prompt}]
         )
         return completion.choices[0].message.content
-    except Exception as e:
-        return f"AI Error: Model issue hai bhai. ({str(e)})"
+    except:
+        return "Bhai, AI ne jawab nahi diya. Check API!"
 
-# --- 3. SMART SYMBOL DETECTION ---
-with st.sidebar:
-    st.header("🔍 Market Search")
-    user_input = st.text_input("Enter Name (e.g. TATAMOTORS, BTC, ETH)", value="").upper().strip()
-    side = st.selectbox("Side", ["BUY", "SELL"])
+# --- 3. MAIN UI (No Sidebar for Mobile Ease) ---
+st.title("🏹 HUNTER AI TERMINAL v8.5")
+st.caption("Mobile Optimized | AI News & Predictions")
+
+# Market Input on Main Screen (Fixes Mobile Visibility) [web:102]
+with st.container():
+    col_in1, col_in2 = st.columns([2, 1])
+    with col_in1:
+        user_input = st.text_input("Stock/Crypto Name (e.g. TATAMOTORS, BTC)", value="").upper().strip()
+    with col_in2:
+        side = st.selectbox("Trade Side", ["BUY", "SELL"])
 
 symbol, current_price, currency = "", 0.0, "$"
 
 if user_input:
-    # Auto-detect loop (.NS -> -USD -> Plain)
     for suffix in [".NS", "-USD", ""]:
         try:
             t = yf.Ticker(f"{user_input}{suffix}")
@@ -63,56 +61,46 @@ if user_input:
                 break
         except: continue
 
-# --- 4. DASHBOARD & BLANK SLATE ---
+# --- 4. BLANK SLATE DASHBOARD ---
 if symbol:
-    st.metric(label=f"Live {symbol} Price", value=f"{currency}{current_price:,.2f}")
-elif user_input:
-    st.error(f"Bhai, '{user_input}' dhoondhne mein dikkat ho rahi hai. Sahi naam daalo.")
+    st.info(f"🟢 Live {symbol}: {currency}{current_price:,.2f}")
 
-# Blank Slate: All values start at 0
-col1, col2 = st.columns(2)
-with col1:
-    qty = st.number_input("Quantity", value=0.0, format="%.2f")
-    leverage = st.number_input("Leverage (x)", value=1.0, step=1.0)
-with col2:
-    entry = st.number_input("Entry Price", value=0.0, format="%.2f")
-    tp = st.number_input("Target Price (TP)", value=0.0, format="%.2f")
-    sl = st.number_input("Stop Loss Price (SL)", value=0.0, format="%.2f")
+    # Inputs Grid
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        qty = st.number_input("Quantity", value=0.0)
+        leverage = st.number_input("Leverage (x)", value=1.0)
+    with col_b:
+        entry = st.number_input("Entry Price", value=0.0)
+        tp = st.number_input("Target (TP)", value=0.0)
+    with col_c:
+        sl = st.number_input("Stop Loss (SL)", value=0.0)
 
-# --- 5. MATH ENGINE & RESULTS ---
-if qty > 0 and entry > 0 and current_price > 0:
-    # Pure Math Logic (v5.0 style) [conversation_history:67]
-    pos_size = entry * qty
-    req_margin = pos_size / leverage
-    price_diff = (current_price - entry) if side == "BUY" else (entry - current_price)
-    pnl_real = price_diff * qty
-    roe = (pnl_real / req_margin) * 100 if req_margin > 0 else 0
-    pnl_tp = abs(tp - entry) * qty
-    pnl_sl = abs(entry - sl) * qty
-    rr = pnl_tp / pnl_sl if pnl_sl > 0 else 0
+    # Calculation Logic
+    if qty > 0 and entry > 0:
+        pos_size = entry * qty
+        req_margin = pos_size / leverage
+        pnl_real = ((current_price - entry) if side == "BUY" else (entry - current_price)) * qty
+        roe = (pnl_real / req_margin) * 100 if req_margin > 0 else 0
+        pnl_tp = abs(tp - entry) * qty
+        pnl_sl = abs(entry - sl) * qty
+        rr = pnl_tp / pnl_sl if pnl_sl > 0 else 0
 
-    st.markdown("---")
-    st.subheader("📋 Live Trading Dashboard")
-    
-    df = pd.DataFrame({
-        "Metrics": ["Required Margin", "Position Size", "Live PnL", "ROE %", "TP Profit", "SL Loss", "R:R Ratio"],
-        "Value": [
-            f"{currency}{req_margin:,.2f}",
-            f"{currency}{pos_size:,.2f}",
-            f"{currency}{pnl_real:,.2f}",
-            f"{roe:.2f}%",
-            f"{currency}{pnl_tp:,.2f}",
-            f"{currency}{pnl_sl:,.2f}",
-            f"1 : {rr:.2f}"
-        ]
-    })
-    st.table(df.set_index("Metrics"))
+        st.markdown("---")
+        st.subheader("📋 Dashboard")
+        
+        # Compact Table for Mobile [web:108]
+        df = pd.DataFrame({
+            "Metrics": ["Margin", "PnL", "ROE %", "TP/SL Profit", "R:R"],
+            "Value": [f"{currency}{req_margin:,.0f}", f"{currency}{pnl_real:,.2f}", f"{roe:.1f}%", f"{pnl_tp:,.0f} / {pnl_sl:,.0f}", f"1:{rr:.1f}"]
+        })
+        st.table(df.set_index("Metrics"))
 
-    # AI Analysis Button
-    if st.button("🤖 GET AI ANALYSIS"):
-        with st.spinner("Hunter AI dimaag laga raha hai..."):
-            res = get_ai_analysis(symbol, current_price, side, f"{currency}{pnl_real:,.2f}", round(roe, 2))
-            st.info(res)
+        # --- AI NEWS & PREDICTION BUTTON ---
+        if st.button("🤖 GET AI NEWS & PREDICTION"):
+            with st.expander("Hunter AI Analysis", expanded=True): [web:117]
+                with st.spinner("AI analysis kar raha hai..."):
+                    res = get_ai_insight(symbol, current_price, side, f"{currency}{pnl_real:,.2f}", round(roe, 2))
+                    st.write(res)
 else:
-    if user_input and symbol:
-        st.info("Bhai, Quantity aur Entry daalo tabhi calculation dikhega.")
+    if user_input: st.error("Bhai, symbol dhoondhne mein error hai.")
