@@ -2,12 +2,12 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# UI Setup
+# UI Config
 st.set_page_config(page_title="Begusarai Hunter Terminal", layout="centered")
 st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;}</style>", unsafe_allow_html=True)
 
 st.title("🏹 HUNTER PRO TERMINAL")
-st.caption("Smart Detection | Zero Confusion | Blank Slate")
+st.caption("Auto-Detect Fixed | No Margin Confusion | Blank Slate")
 
 # 1. Market Input
 with st.sidebar:
@@ -15,51 +15,59 @@ with st.sidebar:
     user_input = st.text_input("Enter Name (e.g. TATAMOTORS, BTC)", value="").upper().strip()
     side = st.selectbox("Side", ["BUY", "SELL"])
 
-# --- SMART DETECTION LOGIC ---
+# --- BULLETPROOF DETECTION ---
 symbol = ""
 current_price = 0.0
 currency = "$"
 
 if user_input:
-    # List of options to try in order
-    options = [f"{user_input}.NS", f"{user_input}-USD", user_input]
-    
-    for opt in options:
+    # 1. Try Indian Stock (.NS)
+    try:
+        t_ns = yf.Ticker(f"{user_input}.NS")
+        price_ns = t_ns.fast_info['lastPrice'] # Fast info use kar rahe
+        if price_ns > 0:
+            symbol, current_price, currency = f"{user_input}.NS", price_ns, "₹"
+    except:
+        # 2. Try Crypto (-USD)
         try:
-            ticker = yf.Ticker(opt)
-            hist = ticker.history(period="1d")
-            if not hist.empty:
-                symbol = opt
-                current_price = hist['Close'].iloc[-1]
-                currency = "₹" if ".NS" in opt else "$"
-                break
+            t_usd = yf.Ticker(f"{user_input}-USD")
+            price_usd = t_usd.fast_info['lastPrice']
+            if price_usd > 0:
+                symbol, current_price, currency = f"{user_input}-USD", price_usd, "$"
         except:
-            continue
+            # 3. Try Plain
+            try:
+                t_plain = yf.Ticker(user_input)
+                price_p = t_plain.fast_info['lastPrice']
+                if price_p > 0:
+                    symbol, current_price, currency = user_input, price_p, "$"
+            except:
+                st.error(f"Bhai, '{user_input}' nahi mila. Pura ticker daal ke dekho (e.g. TATAMOTORS.NS)")
 
 # 2. Display Price
 if symbol:
     st.metric(label=f"Live {symbol} Price", value=f"{currency}{current_price:,.2f}")
-elif user_input:
-    st.error(f"Bhai, '{user_input}' nahi mil raha. Ek baar spelling check kar lo.")
 
-# 3. Inputs (Blank Slate)
+# 3. Inputs (Ekdum Blank)
 col1, col2 = st.columns(2)
 with col1:
-    qty = st.number_input("Quantity", value=0.0, step=0.01, format="%.2f")
-    leverage = st.number_input("Leverage (x)", value=1.0, step=1.0)
+    qty = st.number_input("Quantity", value=0.0)
+    leverage = st.number_input("Leverage (x)", value=1.0)
 with col2:
-    entry = st.number_input("Entry Price", value=0.0, format="%.2f")
-    tp = st.number_input("Target Price (TP)", value=0.0, format="%.2f")
-    sl = st.number_input("Stop Loss Price (SL)", value=0.0, format="%.2f")
+    entry = st.number_input("Entry Price", value=0.0)
+    tp = st.number_input("Target Price (TP)", value=0.0)
+    sl = st.number_input("Stop Loss Price (SL)", value=0.0)
 
 # 4. Calculation Logic
 if qty > 0 and entry > 0 and current_price > 0:
-    req_margin = (entry * qty) / leverage
+    # Pure Position Math
+    position_size = entry * qty
+    req_margin = position_size / leverage
+    
+    # Real Live PnL (Binance Style)
     price_diff = (current_price - entry) if side == "BUY" else (entry - current_price)
-    pnl_live = price_diff * qty * (1 if leverage == 1 else leverage/leverage) # Fixed for Spot/Future
-    # Real PnL logic
-    pnl_real = price_diff * qty
-    roe = (pnl_real / req_margin) * 100 if req_margin > 0 else 0
+    pnl_live = price_diff * qty
+    roe = (pnl_live / req_margin) * 100 if req_margin > 0 else 0
     
     pnl_tp = abs(tp - entry) * qty
     pnl_sl = abs(entry - sl) * qty
@@ -70,11 +78,11 @@ if qty > 0 and entry > 0 and current_price > 0:
     st.subheader("📋 Trading Dashboard")
     
     df = pd.DataFrame({
-        "Metrics": ["Required Margin", "Quantity", "Live PnL", "ROE %", "TP Profit", "SL Loss", "R:R Ratio"],
+        "Metrics": ["Required Margin", "Position Size", "Live PnL", "ROE %", "TP Profit", "SL Loss", "R:R Ratio"],
         "Value": [
             f"{currency}{req_margin:,.2f}",
-            f"{qty:.4f}",
-            f"{currency}{pnl_real:,.2f}",
+            f"{currency}{position_size:,.2f}",
+            f"{currency}{pnl_live:,.2f}",
             f"{roe:.2f}%",
             f"{currency}{pnl_tp:,.2f}",
             f"{currency}{pnl_sl:,.2f}",
@@ -82,9 +90,8 @@ if qty > 0 and entry > 0 and current_price > 0:
         ]
     })
     st.table(df.set_index("Metrics"))
-    
-    if pnl_real > 0: st.success("✅ PROFIT")
-    elif pnl_real < 0: st.error("❌ LOSS")
+    if pnl_live > 0: st.success("✅ PROFIT")
+    elif pnl_live < 0: st.error("❌ LOSS")
 else:
-    if user_input:
+    if user_input and symbol:
         st.info("Bhai, Quantity aur Entry Price daalo calculation ke liye.")
