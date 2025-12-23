@@ -7,50 +7,52 @@ from groq import Groq
 st.set_page_config(page_title="Begusarai Hunter Terminal", layout="centered")
 st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;}</style>", unsafe_allow_html=True)
 
-st.title("🏹 HUNTER AI TERMINAL v8.3")
-st.caption("Stable AI Model | Smart Detection | Blank Slate")
+st.title("🏹 HUNTER AI TERMINAL v8.4")
+st.caption("Active AI Model | Smart Detection | Blank Slate")
 
 # --- 2. SECRETS & AI SETUP ---
 try:
+    # Tumhare Streamlit Secrets se key uthayega [image:10]
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     client = Groq(api_key=GROQ_KEY)
 except:
-    st.error("Bhai, Streamlit Secrets mein 'GROQ_API_KEY' nahi mil raha!")
+    st.error("Bhai, Streamlit Secrets mein 'GROQ_API_KEY' check karo!")
     GROQ_KEY = None
 
 def get_ai_analysis(symbol, price, side, pnl, roe):
-    if not GROQ_KEY: return "API Key missing!"
+    if not GROQ_KEY: return "Bhai, API Key connect nahi hui. Secrets check karo!"
     
     prompt = f"""
-    Bhai, main Begusarai se ek trader hoon. Mera current trade:
-    Symbol: {symbol} | Price: {price} | Side: {side}
+    Bhai, main Begusarai se ek trader hoon. Mera current trade details ye hain:
+    Stock/Crypto: {symbol} | Current Price: {price} | Side: {side}
     Live PnL: {pnl} | ROE: {roe}%
     
-    Mujhe short analysis do trader style Hinglish mein:
-    1. Trend kaisa hai?
-    2. Hold karun ya Exit?
-    Short and powerful jawab dena.
+    Mujhe is trade ke baare mein short analysis do. 
+    1. Trend kaisa lag raha hai?
+    2. Kya mujhe hold karna chahiye ya profit book karna chahiye?
+    Ekdum trader wali desi Hinglish bhasha mein jawab do (short and powerful).
     """
     try:
-        # Using the most stable model to avoid decommission errors [web:85]
+        # llama-3.1-8b-instant is currently the most stable active model [web:85]
         completion = client.chat.completions.create(
-            model="llama3-8b-8192", 
-            messages=[{"role": "user", "content": prompt}]
+            model="llama-3.1-8b-instant", 
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
         )
         return completion.choices[0].message.content
     except Exception as e:
-        return f"AI Error: {str(e)}"
+        return f"AI Error: Model issue hai bhai. ({str(e)})"
 
 # --- 3. SMART SYMBOL DETECTION ---
 with st.sidebar:
     st.header("🔍 Market Search")
-    user_input = st.text_input("Enter Name (e.g. RELIANCE, BTC, ETH)", value="").upper().strip()
+    user_input = st.text_input("Enter Name (e.g. TATAMOTORS, BTC, ETH)", value="").upper().strip()
     side = st.selectbox("Side", ["BUY", "SELL"])
 
 symbol, current_price, currency = "", 0.0, "$"
 
 if user_input:
-    # Auto-detect logic (.NS -> -USD -> Plain)
+    # Auto-detect loop (.NS -> -USD -> Plain)
     for suffix in [".NS", "-USD", ""]:
         try:
             t = yf.Ticker(f"{user_input}{suffix}")
@@ -61,12 +63,13 @@ if user_input:
                 break
         except: continue
 
-# --- 4. BLANK SLATE UI ---
+# --- 4. DASHBOARD & BLANK SLATE ---
 if symbol:
     st.metric(label=f"Live {symbol} Price", value=f"{currency}{current_price:,.2f}")
 elif user_input:
-    st.error(f"Bhai, '{user_input}' dhoondhne mein dikkat ho rahi hai.")
+    st.error(f"Bhai, '{user_input}' dhoondhne mein dikkat ho rahi hai. Sahi naam daalo.")
 
+# Blank Slate: All values start at 0
 col1, col2 = st.columns(2)
 with col1:
     qty = st.number_input("Quantity", value=0.0, format="%.2f")
@@ -76,8 +79,9 @@ with col2:
     tp = st.number_input("Target Price (TP)", value=0.0, format="%.2f")
     sl = st.number_input("Stop Loss Price (SL)", value=0.0, format="%.2f")
 
-# --- 5. MATH & DASHBOARD ---
+# --- 5. MATH ENGINE & RESULTS ---
 if qty > 0 and entry > 0 and current_price > 0:
+    # Pure Math Logic (v5.0 style) [conversation_history:67]
     pos_size = entry * qty
     req_margin = pos_size / leverage
     price_diff = (current_price - entry) if side == "BUY" else (entry - current_price)
@@ -102,9 +106,9 @@ if qty > 0 and entry > 0 and current_price > 0:
             f"1 : {rr:.2f}"
         ]
     })
-    # Display table without the index (0, 1, 2...)
     st.table(df.set_index("Metrics"))
 
+    # AI Analysis Button
     if st.button("🤖 GET AI ANALYSIS"):
         with st.spinner("Hunter AI dimaag laga raha hai..."):
             res = get_ai_analysis(symbol, current_price, side, f"{currency}{pnl_real:,.2f}", round(roe, 2))
