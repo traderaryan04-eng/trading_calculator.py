@@ -2,66 +2,71 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# UI Setup
-st.set_page_config(page_title="Begusarai Hunter Trader", layout="centered")
+# UI Config
+st.set_page_config(page_title="Hunter Pro Terminal", layout="wide")
 st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;}</style>", unsafe_allow_html=True)
 
-st.title("🚀 BEGUSARAI HUNTER: TRADER TERMINAL")
-st.caption("Position Sizer + Live PnL + Risk Management")
+st.title("🏹 HUNTER PRO: ULTIMATE TRADING TERMINAL")
+st.caption("Begusarai Edition - Mathematically Perfect & Pro UI")
 
-# 1. Sidebar for Inputs
-st.sidebar.header("📊 Trade Configuration")
-symbol = st.sidebar.text_input("Symbol (BTC-USD / RELIANCE.NS)", value="BTC-USD").upper()
-side = st.sidebar.selectbox("Side", ["BUY", "SELL"])
+# 1. Inputs - Market Selection
+with st.sidebar:
+    st.header("⚙️ Settings")
+    symbol = st.text_input("Symbol (BTC-USD / RELIANCE.NS)", value="BTC-USD").upper().strip()
+    side = st.selectbox("Side", ["BUY", "SELL"])
+    rr_ratio = st.slider("Risk : Reward Ratio (1:X)", 1.0, 5.0, 2.0, 0.5)
 
-# Auto-detect Market & Currency
-currency = "₹" if ".NS" in symbol else "$"
-max_lev = 20 if ".NS" in symbol else 200
-
-# 2. Live Data Fetch
+# 2. Live Data Fetching
 try:
     stock = yf.Ticker(symbol)
     current_price = stock.history(period="1d")['Close'].iloc[-1]
+    currency = "₹" if ".NS" in symbol else "$"
     st.metric(label=f"Live {symbol} Price", value=f"{currency}{current_price:,.2f}")
 except:
-    st.error("Bhai, symbol sahi daalo!")
+    st.error("Bhai, symbol invalid hai! Check karke sahi daalo.")
     st.stop()
 
-# 3. Entry & Leverage Inputs
-col1, col2 = st.columns(2)
+# 3. Position Configuration
+col1, col2, col3 = st.columns(3)
 with col1:
-    qty = st.number_input("Quantity", min_value=0.01, value=1.0)
-    leverage = st.slider("Manual Leverage", 1, max_lev, 50)
+    margin_input = st.number_input(f"Your Margin ({currency})", min_value=1.0, value=100.0)
+    leverage = st.number_input("Leverage (x)", min_value=1.0, max_value=200.0, value=50.0)
+
+# Real Exchange Math
+position_size = margin_input * leverage
+qty = position_size / current_price
+
 with col2:
     entry = st.number_input("Entry Price", value=float(current_price))
-    tp = st.number_input("Target Profit (TP)", value=float(current_price * 1.02))
-    sl = st.number_input("Stop Loss (SL)", value=float(current_price * 0.98))
+    # Auto TP/SL Calculation based on R:R
+    # Risking 2% of position by default for calculation
+    risk_per_share = (entry * 0.02) 
+    sl_calc = (entry - risk_per_share) if side == "BUY" else (entry + risk_per_share)
+    tp_calc = entry + (abs(entry - sl_calc) * rr_ratio) if side == "BUY" else entry - (abs(entry - sl_calc) * rr_ratio)
+    
+    tp = st.number_input("Target Profit (TP)", value=float(tp_calc))
+    sl = st.number_input("Stop Loss (SL)", value=float(sl_calc))
 
-# 4. Math Logic (Delta/Binance Style)
-margin_req = (entry * qty) / leverage
+# 4. Result Calculations (FIXED MATH)
 price_diff = (current_price - entry) if side == "BUY" else (entry - current_price)
-pnl_live = price_diff * qty * leverage
-roe = (pnl_live / margin_req) * 100 if margin_req > 0 else 0
+pnl_live = price_diff * qty
+roe = (pnl_live / margin_input) * 100
 
-pnl_tp = abs(tp - entry) * qty * leverage
-pnl_sl = abs(entry - sl) * qty * leverage
+pnl_tp = abs(tp - entry) * qty
+pnl_sl = abs(entry - sl) * qty
 
-# 5. Dashboard Output
+# 5. Pro Dashboard UI
 st.markdown("---")
-st.subheader("📈 Trading Dashboard")
+st.subheader("📊 Live Trading Dashboard")
 
-# Status Logic Fix
-if pnl_live > 0:
-    status = "✅ PROFIT"
-elif pnl_live < 0:
-    status = "❌ LOSS"
-else:
-    status = "⏳ NEUTRAL/ACTIVE"
+status = "✅ PROFIT" if pnl_live > 0 else "❌ LOSS" if pnl_live < 0 else "⏳ ACTIVE"
 
-data = {
-    "Field": ["Margin Required", "Live PnL", "ROE %", "Target Profit", "Stop Loss", "Status"],
+df_data = {
+    "Metrics": ["Required Margin", "Position Size", "Quantity", "Live PnL", "ROE %", "TP Profit", "SL Loss", "Status"],
     "Value": [
-        f"{currency}{margin_req:,.2f}",
+        f"{currency}{margin_input:,.2f}",
+        f"{currency}{position_size:,.2f}",
+        f"{qty:.4f}",
         f"{currency}{pnl_live:,.2f}",
         f"{roe:.2f}%",
         f"{currency}{pnl_tp:,.2f}",
@@ -69,6 +74,9 @@ data = {
         status
     ]
 }
-st.table(pd.DataFrame(data))
 
-st.info(f"Hunter Tip: {symbol} is a {'Stock' if '.NS' in symbol else 'Crypto/US Asset'}. Max Leverage: {max_lev}x")
+# Style the table
+df = pd.DataFrame(df_data)
+st.table(df.set_index('Metrics'))
+
+st.success(f"Hunter Strategy: Risking {currency}{pnl_sl:,.2f} to earn {currency}{pnl_tp:,.2f} (R:R 1:{rr_ratio})")
