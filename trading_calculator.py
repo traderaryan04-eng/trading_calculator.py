@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 from groq import Groq
 
-# 1. UI Configuration (Wide & Mobile Friendly)
+# 1. UI Setup (Mobile Optimized)
 st.set_page_config(page_title="Hunter AI Terminal", layout="wide")
 st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;}</style>", unsafe_allow_html=True)
 
@@ -16,16 +16,14 @@ except:
     GROQ_KEY = None
 
 def get_ai_insight(symbol, price, side, pnl, roe):
-    # NEWS + PREDICTION Prompt [web:113]
     prompt = f"""
     You are a Begusarai Trader AI. Analyze this trade:
     Symbol: {symbol} | Price: {price} | Side: {side} | PnL: {pnl} | ROE: {roe}%
     
-    Tasks:
-    1. Latest generic market news related to this asset.
-    2. Short-term Price Prediction (Bullish/Bearish).
-    3. Final advice for a 'Hunter' trader.
-    Speak in Hinglish (Desi style). Keep it short.
+    Give me:
+    1. Short Market News related to this asset.
+    2. Short-term Price Prediction.
+    3. Hold/Exit advice in Hinglish (Desi style).
     """
     try:
         completion = client.chat.completions.create(
@@ -33,20 +31,20 @@ def get_ai_insight(symbol, price, side, pnl, roe):
             messages=[{"role": "user", "content": prompt}]
         )
         return completion.choices[0].message.content
-    except:
-        return "Bhai, AI ne jawab nahi diya. Check API!"
+    except Exception as e:
+        return f"AI Error: {str(e)}"
 
-# --- 3. MAIN UI (No Sidebar for Mobile Ease) ---
-st.title("🏹 HUNTER AI TERMINAL v8.5")
-st.caption("Mobile Optimized | AI News & Predictions")
+# --- 3. MAIN UI (No Sidebar for Mobile) ---
+st.title("🏹 HUNTER AI TERMINAL v8.6")
+st.caption("Clean Code | News & Predictions | Mobile Ready")
 
-# Market Input on Main Screen (Fixes Mobile Visibility) [web:102]
+# Inputs Container
 with st.container():
     col_in1, col_in2 = st.columns([2, 1])
     with col_in1:
-        user_input = st.text_input("Stock/Crypto Name (e.g. TATAMOTORS, BTC)", value="").upper().strip()
+        user_input = st.text_input("Enter Name (e.g. TATAMOTORS, BTC)", value="").upper().strip()
     with col_in2:
-        side = st.selectbox("Trade Side", ["BUY", "SELL"])
+        side = st.selectbox("Side", ["BUY", "SELL"])
 
 symbol, current_price, currency = "", 0.0, "$"
 
@@ -61,11 +59,10 @@ if user_input:
                 break
         except: continue
 
-# --- 4. BLANK SLATE DASHBOARD ---
+# --- 4. DASHBOARD ---
 if symbol:
     st.info(f"🟢 Live {symbol}: {currency}{current_price:,.2f}")
 
-    # Inputs Grid
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         qty = st.number_input("Quantity", value=0.0)
@@ -76,8 +73,8 @@ if symbol:
     with col_c:
         sl = st.number_input("Stop Loss (SL)", value=0.0)
 
-    # Calculation Logic
     if qty > 0 and entry > 0:
+        # Math Engine
         pos_size = entry * qty
         req_margin = pos_size / leverage
         pnl_real = ((current_price - entry) if side == "BUY" else (entry - current_price)) * qty
@@ -87,18 +84,24 @@ if symbol:
         rr = pnl_tp / pnl_sl if pnl_sl > 0 else 0
 
         st.markdown("---")
-        st.subheader("📋 Dashboard")
+        st.subheader("📋 Results Dashboard")
         
-        # Compact Table for Mobile [web:108]
         df = pd.DataFrame({
-            "Metrics": ["Margin", "PnL", "ROE %", "TP/SL Profit", "R:R"],
-            "Value": [f"{currency}{req_margin:,.0f}", f"{currency}{pnl_real:,.2f}", f"{roe:.1f}%", f"{pnl_tp:,.0f} / {pnl_sl:,.0f}", f"1:{rr:.1f}"]
+            "Metrics": ["Margin Needed", "Live PnL", "ROE %", "TP Profit", "SL Loss", "R:R Ratio"],
+            "Value": [
+                f"{currency}{req_margin:,.2f}", 
+                f"{currency}{pnl_real:,.2f}", 
+                f"{roe:.2f}%", 
+                f"{currency}{pnl_tp:,.0f}", 
+                f"{currency}{pnl_sl:,.0f}", 
+                f"1:{rr:.2f}"
+            ]
         })
         st.table(df.set_index("Metrics"))
 
-        # --- AI NEWS & PREDICTION BUTTON ---
+        # AI NEWS & PREDICTION BUTTON
         if st.button("🤖 GET AI NEWS & PREDICTION"):
-            with st.expander("Hunter AI Analysis", expanded=True): [web:117]
+            with st.expander("Hunter AI Deep Analysis", expanded=True):
                 with st.spinner("AI analysis kar raha hai..."):
                     res = get_ai_insight(symbol, current_price, side, f"{currency}{pnl_real:,.2f}", round(roe, 2))
                     st.write(res)
